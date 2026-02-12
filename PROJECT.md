@@ -2,28 +2,36 @@
 
 ## Vision
 
-...
+A centralized configuration and feature-flag service that allows multiple applications to retrieve runtime configuration in a single call.
 
 ## Problem it solves
 
-...
+Applications need a simple and consistent way to manage:
+
+- Feature flags
+- Environment-specific configuration
+- Runtime changes without redeploying
+
+This project provides a minimal and stable configuration hub.
 
 ## Scope (v1)
 
-1. An admin can create/edit flags and configs for each app and environment.
-2. Any client app can ask "give me ALL (falgs+config" in unique call.
-3. The client catch and use it in runtime.
+- An admin can create/edit flags and configs for each app and environment.
+- Any client app can ask: "give me all flags and configs" in a single call.
+- The client caches and uses it at runtime.
+- Small and stable model.
+- No overengineering.
 
-## Minimun model (small and stable)
-
-Concepts:
+## Concepts
 
 - appId (string) -> "notes-api", "media-api"
 - env (string/enum) -> "dev", "prod"
 - key (string) -> "feature.search", "limits.pageSize"
-- type (FLAG/CONFIG)
-- value (for flag: boolean; for config: string) ...for now
-- version (int/long) for cache/ETag
+- kind (FLAG | CONFIG)
+- value
+  - flag: boolean
+  - config: string (for now)
+- version (int/long) -> for cache/ETag
 - updatedAt (date)
 
 ## Table (as simple as possible)
@@ -35,13 +43,12 @@ Concepts:
   - app_id
   - env
   - key
-  - kind (FLAG/CONFIG)
+  - kind (FLAG | CONFIG)
   - value (string)
-  - version
   - updated_at
-  - UNICQUE(app_id, env, key)
+  `UNIQUE(app_id, env, key)`
 
-## Endpints
+## Endpoints
 
 - Upsert Flag
 
@@ -79,10 +86,14 @@ GET /config/apps/{appId}/envs/{env}/snapshot
 GET /admin/apps/{appId}/envs/{env}/{kind}/{key}
 ```
 
+> Admin endpoints are for management. Client endpoints are read-only and optimized for runtime usage.
+
 ### Cache
 
-- Supports `ETag` in snapshot and `If-None_match` in the client.
-- if any changes, returns `304 Not Modified`.
+- Snapshot supoorts `ETag`
+- Client supports `If-None-Match`.
+- If nothing changed -> return `304 Not Modified`.
+- If changed -> return `200 ok` with the new snapshot and a new ETag
 
 ## Architecture (v1)
 
@@ -104,18 +115,20 @@ towards a more hexagonal style if needed.
 
 ### Iteration 1 - Vertical Slice (End-to-End minimal flow)
 
-Goal: Make the system usable as son as possible.
+Goal: Make the system usable as soon as possible.
 
-- Create SpringBoot project
-- Create `entry`table + JPA entity
+- Create Spring Boot project
+- Create `entry` table + JPA entity
 - Implement:
   - PUT flag
   - GET snapshot (no ETag yet)
-- Harcode one test client or curl script
-- Verify:
-  - Create flag
-  - Retrieve snapshot
-  - Use it in a dummy app
+- Hardcode one test client or curl script
+
+Verify:
+
+- Create flag
+- Retrieve snapshot
+- Use it in a dummy app
 
 Focus:
 
@@ -126,27 +139,30 @@ Focus:
 
 Goal: stabilize the model.
 
-- Add:
-  - PUT config
-  - GET entries
-  - DELETE entry
-  - GET single entry
-- Add validation rules
-- Add basic error handling (ProblemDetails)
-- Add simple login
+Add:
+
+- PUT config
+- GET entries
+- DELETE entry
+- GET single entry
+- Validation rules
+- Basic error handling (ProblemDetails)
+- Simple login
 
 Focus:
 
 - Clean controller/service separation
-- No business login in controllers
+- No business logic in controllers
 
 ### Iteration 3 - Caching & Snapshot Versioning
 
 Goal: Make it production-like
 
-- Add global snapshot revision
-- Implement ETag support
-- Support `If-None-Match`
+Add:
+
+- Global snapshot revision.
+- ETag support.
+- If-None-Match handling.
 - Ensure version increments only when data changes
 
 Focus:
@@ -157,15 +173,39 @@ Focus:
 
 ### Iteration 4 - Refactor Architecture
 
-Goal: Prepare to evolution
+Goal: Prepare for evolution
 
 - Introduce `ConfigurationEntryStore` interface
 - Move JPA into infrastructure adapter
 - Isolate domain from JPA annotations
-- Introduce vasic unit tests for use cases
+- Introduce basic unit tests for use cases
 
 Focus:
 
 - Dependency direction
 - Decoupling
-- Cleand boundaries
+- Clean boundaries
+
+## Why not using an existing solution?
+
+This project is primarily a learning exercise.
+
+It is not intended to compete with full-featured platforms like LaunchDarkly or Unleash.
+
+Those tools already provide advanced capabilities such as:
+
+- Targeting and segmentation
+- Scheduling
+- Audit trails
+- Role-based access control
+- UI dashboards
+- Multi-tenant and distributed setups
+
+The goal of config-hub is different:
+
+- To explore and understand the design of a minimal configuration service
+- To practice architectural decisions step by step
+- To keep the model small and controlled
+- To potentially use it in a personal self-hosted environment if it proves useful
+
+If future requirements grow beyond this scope, adopting or integrating with a specialized platform would make more sense.

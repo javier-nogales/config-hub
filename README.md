@@ -1,3 +1,3 @@
-#config-hub
+# config-hub
 
 A lightweight central configuration and feature flag service for microservice-based systems.
